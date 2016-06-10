@@ -1,0 +1,16 @@
+{
+    "apps": [
+        {
+            "name": "visual",
+            "script": "index.js",
+            "watch": ["src"],
+            "ignore_watch": ["src/view"],
+            "env": {
+                "NODE_ENV": "development"
+            },
+            "env_production" : {
+                "NODE_ENV": "production"
+            }
+        }
+    ]
+}

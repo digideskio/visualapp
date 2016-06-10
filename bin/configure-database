@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# http://redsymbol.net/articles/unofficial-bash-strict-mode/
+# http://www.gnu.org/software/bash/manual/bash.html#The-Set-Builtin
+set -o nounset  # Treat unset variables as an error when substituting
+set -o errexit  # Exit immediately if a command exits with a non-zero status
+set -o pipefail # Status code of a pipeline will be the status code of first failed command in it or 0
+
+script=`readlink -f $0`
+scriptdir=`dirname $script`
+scriptname=`basename $script`
+repo=`cd $scriptdir; git rev-parse --show-toplevel`
+
+cd $repo
+
+function mysql-do()
+{
+    mysql --defaults-extra-file=<(echo -e "[client]\npassword=$DB_PASSWORD") -u $DB_USERNAME -h $DB_HOST -P $DB_PORT -D $DB_DATABASE "$@"
+}
+
+function drop()
+{
+    mysql-root-do << EOF
+        -- drop database
+            DROP DATABASE IF EXISTS $DB_DATABASE;
+        
+            -- Bug #19166  DROP USER IF EXISTS
+            -- http://bugs.mysql.com/bug.php?id=19166
+            -- > A good workaround is to grant a harmless privilege to the
+            -- > user before dropping it. This will create the user if it
+            -- > doesn't exist, so that it can be dropped safely
+        
+            -- http://dev.mysql.com/doc/refman/5.1/en/grant.html
+            -- > However, if an account named in a GRANT statement does
+            -- > not already exist, GRANT may create it under the
+            -- > conditions described later in the discussion of the
+            -- > NO_AUTO_CREATE_USER SQL mode.
+            GRANT USAGE ON *.* TO '$DB_USERNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';
+            DROP USER '$DB_USERNAME'@'$DB_HOST';
+        
+            -- 10.1.5. Configuring the Character Set and Collation for Applications
+            -- http://dev.mysql.com/doc/refman/5.1/en/charset-applications.html
+            -- > Specify character settings per database. To create a
+            -- > database such that its tables will use a given default
+            -- > character set and collation for data storage, use a CREATE
+            -- > DATABASE statement like this:
+            -- >
+            -- >    CREATE DATABASE mydb
+            -- >        DEFAULT CHARACTER SET utf8
+            -- >        DEFAULT COLLATE utf8_general_ci;
+            -- >
+            -- > Tables created in the database will use utf8 and
+            -- > utf8_general_ci by default for any character columns.
+        
+        -- create database
+            CREATE DATABASE $DB_DATABASE
+                DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;
+        
+        -- create user
+            CREATE USER '$DB_USERNAME'@'$DB_HOST' IDENTIFIED BY '$DB_PASSWORD';
+            GRANT ALL ON $DB_DATABASE.* TO '$DB_USERNAME'@'$DB_HOST';
+EOF
+}
+
+source .env
+
+if test $# -gt 0 && test $1 == '--fresh'; then
+    drop
+    knex migrate:latest
+    knex seed:run
+else
+    exit 
+    if mysql-do -e ';'; then
+        knex migrate:latest
+    else
+        echo error: database was not created yet > /dev/stderr
+        echo error: use --fresh to create it > /dev/stderr
+        exit 1
+    fi
+fi
