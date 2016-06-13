@@ -8,7 +8,7 @@ var app = express();
 
 app.set('devel', true);
 
-app.use(auth);
+// app.use(auth);
 app.use('/', home);
 app.use('/frontend', frontend);
 
