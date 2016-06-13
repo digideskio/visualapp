@@ -1,0 +1,32 @@
+
+        ,-----------.
+        | visua app |
+        `-----------'
+
+GET /
+    UI
+
+GET /page/new
+    start editing new page
+
+GET /page/1
+    view specified page
+
+GET /page/1/edit
+    edit specified page
+
+GET /frontend/pages
+    list of all pages
+
+    {
+        title: 'hello',
+        contents: '...'
+    }
+
+POST /page
+    create new page
+
+    return url for posting updates
+
+POST /page/1
+    update specified page
